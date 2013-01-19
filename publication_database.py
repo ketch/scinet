@@ -2,7 +2,9 @@
 Class for operating on bibliograhpic databases.  Use bibfile2dictlist() on
 a bibtex file to get a list appropriate for conversion to a PublicationDatabase.
 
-Example:
+Examples:
+
+Create a coauthor graph from an existing bibtex file:
 
     >>> import bibdig
     >>> publist=bibdig.bibfile2dictlist('ssp_search.bib')
@@ -12,7 +14,22 @@ Example:
     >>> import coauthors
     >>> coauthors.plot_ca_graph(G)
 
+To generate the graph in Gephi, do:
+
+    >>> import networkx
+    >>> networkx.write_graphml(G,'ca_graph.graphml')
+	
+then load the graphml file in Gephi and to make things look nice you 
+might follow the instructions at
+
+https://github.com/stared/tag-graph-map-of-stackexchange
+
+To extract just the largest connected component of the graph:
+
+    >>> G = networkx.connected_component_subgraphs(G)[0]
+
 """
+bad_chars = ['\\','"']
 def load(fname):
     import pickle
     f=file(fname)
@@ -63,8 +80,9 @@ class PublicationDatabase(list):
 
     def npubs_by_author(self):
         """ 
-        Return a list of all authors in the database, with the
-        number of publications by each
+        Return a list containing a triple for each author in the database:
+
+        (author name, number of publication, weighted number of publications)
         """
         from  operator import itemgetter
 
@@ -118,6 +136,7 @@ class PublicationDatabase(list):
 
         G=nx.Graph()
         G.add_node(author)
+
         for coauthor,num_coauthored_pubs in coauthors_and_num_pubs:
             G.add_node(coauthor)
             G.add_edge(author,coauthor,weight=num_coauthored_pubs)
@@ -138,22 +157,37 @@ class PublicationDatabase(list):
     def author_graph(self):
         """
         Construct the full graph of all coauthorships in the database.
+
+        Each node is a 2-tuple consisting of a string and an int: 
+        (author name, number of publications)
         """
         
         import networkx as nx
 
         G=nx.Graph()
+
+        # Set up nodes
+        npa = self.npubs_by_author()
+        auths = [a[0] for a in npa]
+        npubs = [a[1] for a in npa]
+        for auth, npub in zip(auths,npubs):
+            #G.add_node((auth,npub))
+            pass
+
         for pub in self:
             #This is the only way I could figure to get everything into unicode so
             #that pygraphviz is happy with it.
             pub['authors']=[unicode(auth,'utf-8') for auth in pub['authors']]
             pub['authors']=[auth.encode('ascii','replace') for auth in pub['authors']]
+            # Still have to delete some characters:
+            for char in bad_chars:
+                pub['authors']=[auth.replace(char,'') for auth in pub['authors']]
+            for auth in pub['authors']:
+                if not G.has_node(auth):
+                    G.add_node(auth)
             
         for pub in self:
             num_authors=len(pub['authors'])
-            for author in pub['authors']:
-                if not G.has_node(author):
-                    G.add_node(author)
             for i,author in enumerate(pub['authors']):
                 for author2 in pub['authors'][i+1:]:
                     if G.has_edge(author,author2):
@@ -161,3 +195,26 @@ class PublicationDatabase(list):
                     else:
                         G.add_edge(author,author2,weight=1./(num_authors-1))
         return G
+
+    def list_lastname_matches(self, lastname, inclusive=True):
+        """Return all authors with a given last name."""
+        matches = []
+        for pub in self:
+            for author in pub['authors']:
+                if not inclusive:
+                    if author.split()[-1]==lastname:
+                        if author not in matches:
+                            matches.append(author)
+                else:
+                    if lastname in author.split()[-1]:
+                        if author not in matches:
+                            matches.append(author)
+        return matches
+
+    def remove_author_pubs(self, author):
+        n = 0
+        for pub in self:
+            if author in pub['authors']:
+                self.remove(pub)
+                n += 1
+        print n, ' publications removed'

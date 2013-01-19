@@ -1,4 +1,25 @@
-#Find all coauthors of an author, with number of coauthored works
+"""
+Build and manipulate graphs of co-authors.
+
+To remove degree-1 nodes:
+
+	nn = []
+	for node in G.nodes_iter():
+    		if G.degree(node)<2:
+        		nn.append(node)        		
+	for node in nn:
+	    GG.remove_node(node)
+
+To remove nodes with only one paper:
+
+	nn = []
+	for node in GG.nodes_iter():
+    		if sum([edge['weight'] for edge in GG[node].values()])<=1.:
+        		nn.append(node)
+        for node in nn:             
+	    GG.remove_node(node)
+"""
+
 
 import networkx as nx
 
@@ -43,7 +64,13 @@ def coauthor_graph(author):
     return G
 
 
-def plot_ca_graph(G,nodescale=20,fontsize=10,labelthreshold=2):
+def plot_ca_graph(G,nodescale=20,fontsize=10,labelthreshold=2,edgescale=4):
+    """
+    Plot graph of coauthorship.
+
+    Author nodes are sized proportionally to the number of publications.
+    Edges are sized proportionally to the number of coauthored publications.
+    """
     import matplotlib.pyplot as plt
     import numpy as np
 
@@ -69,13 +96,11 @@ def plot_ca_graph(G,nodescale=20,fontsize=10,labelthreshold=2):
     #    edge[2]['weight']=str(edge[2]['weight'])
     #edge_weights=[float(edge[2]['weight']) for edge in G.edges(data=True)]
 
-    edge_weights=[edge[2]['weight'] for edge in G.edges(data=True)]
+    edge_weights=np.array([edge[2]['weight'] for edge in G.edges(data=True)])
     nodesize=nodescale*(1+10*np.log2(nodeweights))
     nx.draw_networkx_nodes(G,pos,node_size=nodesize,node_color='c')
     nx.draw_networkx_labels(G,pos,font_size=fontsize,labels=nodelabel,font_weight='bold')
-    nx.draw_networkx_edges(G,pos,edgelist=G.edges(),edge_color='r',edge_cmap=plt.cm.Blues,width=4*edge_weights)
-    #plt.show()
-    #plt.hold(False)
+    nx.draw_networkx_edges(G,pos,edgelist=G.edges(),edge_color='r',edge_cmap=plt.cm.Blues,width=edgescale*edge_weights)
 
 
 def author_format(auth_str):
@@ -143,3 +168,10 @@ def find_name_match(name,lastnames_list,initials_list):
     return -1
 
 
+def trim_small_components(G,threshold=None):
+    """Remove small components of G that are not connected to the rest."""
+    import networkx
+    sg = networkx.connected_component_subgraphs(G)
+    if threshold is None:
+        threshold = len(sg[0])/5
+    return networkx.union_all([g for g in sg if len(g)>=threshold])

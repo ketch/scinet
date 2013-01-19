@@ -3,7 +3,9 @@ Requires: bibtex.py
           bibliograph package
 """
 
-def bibfile2dictlist(fname,do_postprocess=True,scopus=True,printupdates=False):
+bad_chars = ['\\','"']
+
+def bibfile2dictlist(fname,do_postprocess=True,scopus=False,printupdates=False):
     """
     Takes a *.bib file name as input, and returns a list, with each
     element a dictionary corresponding to one of the BibTeX entries
@@ -14,7 +16,7 @@ def bibfile2dictlist(fname,do_postprocess=True,scopus=True,printupdates=False):
         - Chokes on blank lines in the middle of bibtex entries
     """
 
-    from bibtex import BibtexParser
+    from bibliograph.parsing.parsers.bibtex import BibtexParser
     import time
 
     bp=BibtexParser()
@@ -104,7 +106,10 @@ def postprocess(biblist):
             authlist=[]
             for author in pub['authors']:
                 firstname=author['firstname'].replace('.','').upper()
+                # Remove strange characters that cause problems for pygraphviz:
                 authname=firstname+' '+author['lastname'].capitalize()
+                for char in bad_chars:
+                    authname = authname.replace(char,'')
                 authlist.append(authname)
             pub['authors']=authlist
         if ' others' in pub['authors']: pub['authors'].remove(' others')

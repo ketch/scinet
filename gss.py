@@ -18,7 +18,7 @@ def search_publications(author):
     print len(publications), ' publications found for ', author
     return publications
 
-def GoogleScholarSearch(terms, limit=100, searchtype=None, start=0):
+def GoogleScholarSearch(terms, limit=1000, searchtype=None, start=0):
     """
     This function searches Google Scholar using the specified terms.
     It returns a list of dictionaries. Each
@@ -56,6 +56,7 @@ def GoogleScholarSearch(terms, limit=100, searchtype=None, start=0):
     finished=False
 
     while not finished:
+        print 'hello'
         url=set_search_url(terms,limit,start,searchtype)
 
         #Now perform the search
@@ -87,28 +88,28 @@ def extract_all_bibtex(html,start,limit):
     Look up Bibtex links to obtain the publication information
     """
     from BeautifulSoup import BeautifulSoup
-    from bibtex import BibtexParser
+    from bibliograph.parsing.parsers.bibtex import BibtexParser
 
     bp=BibtexParser()
     html = html.decode('ascii', 'ignore')
     soup = BeautifulSoup(html)
     results=[]
-    for irec, record in enumerate(soup('p')):
+    for irec, record in enumerate(soup('div',attrs={'class':'gs_ri'})):
         print start+irec
         #Skip records that are just citations, as they are often erroneous
         if str(record.contents[0]).find('CITATION')>-1: continue
         #If there's not BibTeX link, we're at the end:
-        if str(record.contents[0]).find('Import')==-1: break
+        if str(record.contents[-1]).find('Import')==-1: break
 
-        if irec==limit-1: #The last entry is special
-            #Bibtex links are tagged gs_fl
-            h=record.find('span',{'class':'gs_fl'}) 
-            z=[q for q in h('a') if 'bib?' in str(q)]
-            z=z[0]
-        else:
-            z=record('a')[-1]
+        #if irec==limit-1: #The last entry is special
+        #Bibtex links are tagged gs_fl
+        links=record.find('div',{'class':'gs_fl'}) 
+        biblink=[link for link in links('a') if 'bib?' in str(link)]
+        biblink=biblink[0]
+        #else:
+        #    biblink=record('a')[-1]
 
-        url_end=str(z.attrs[0][1])
+        url_end=str(biblink.attrs[0][1])
         url = SEARCH_HOST+url_end
         print url
         req=Request(url,None,headers)
@@ -199,6 +200,7 @@ def postprocess(results):
         else:
             print i, ' what is this one?'
             print paper['reference_type']
+            print paper['title']
             wherepub='title'
             okay=False
         capwords=[s.capitalize() for s in paper[wherepub].split()]
@@ -206,12 +208,12 @@ def postprocess(results):
 
         if engtest[0].lower() not in charstr:
             okay=False
-            print 'Non-english paper refjected: ', paper['title']
+            print 'Non-english paper rejected: ', paper['title']
             print paper[wherepub]
         if paper.has_key('publisher'):
             if paper['publisher'][0].lower() not in charstr:
                 okay=False
-                print 'Non-english paper refjected: ', paper['title']
+                print 'Non-english paper rejected: ', paper['title']
                 print 'Publisher: ',paper['publisher']
                 print paper[wherepub]
         #reformat author set
